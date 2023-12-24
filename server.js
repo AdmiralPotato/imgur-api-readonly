@@ -1,14 +1,22 @@
-// server.js
-// where your node app starts
-
-// init project
-var imgur = require('imgur');
-var express = require('express');
-var app = express();
+require('dotenv').config()
+const fs = require('node:fs');
+const imgur = require('imgur');
+const marked = require('marked');
+const express = require('express');
+const app = express();
 
 imgur.setClientId(process.env.IMGUR_API_KEY);
 
-app.engine('md', require('marked-engine').renderFile);
+app.engine('md', (filePath, options, callback) => {
+  fs.readFile(
+    filePath,
+    {encoding: 'utf-8'},
+    (err, content) => {
+      if (err) return callback(err)
+      return callback(null, marked.parse(content))
+    },
+  );
+});
 app.engine('ejs', require('ejs').renderFile);
 
 // http://expressjs.com/en/starter/static-files.html
@@ -21,14 +29,14 @@ app.use(function(req, res, next) {
 });
 
 // http://expressjs.com/en/starter/basic-routing.html
-app.get("/", function (request, response) {
+app.get('/', (request, response) => {
   //response.sendFile();
   app.render(
     __dirname + '/README.md',
     function(err, renderedMarkdown){
       if(err){
         console.error(err);
-        request.send(err);
+        response.send(err);
       } else {
         response.render(
           __dirname + '/views/index.ejs',
@@ -39,12 +47,12 @@ app.get("/", function (request, response) {
 });
 
 
-var pretty = function(json){
+const pretty = function(json){
   return JSON.stringify(json, null, '\t');
 }
 
-var prettyResponseMaker = function(apiMethod){
-  var prettyResponseHandler = function (request, response) {
+const prettyResponseMaker = function(apiMethod){
+  return (request, response) => {
     console.log('attempt: ' + request.params.id);
     response.type('text');
     apiMethod(request.params.id)
@@ -61,7 +69,6 @@ var prettyResponseMaker = function(apiMethod){
           }));
       });
   };
-  return prettyResponseHandler;
 }
 
 app.get("/image/:id", prettyResponseMaker(imgur.getInfo));
@@ -69,6 +76,6 @@ app.get("/album/:id", prettyResponseMaker(imgur.getAlbumInfo));
 
 
 // listen for requests :)
-var listener = app.listen(process.env.PORT, function () {
+const listener = app.listen(process.env.PORT, function () {
   console.log('Your app is listening on port ' + listener.address().port);
 });
